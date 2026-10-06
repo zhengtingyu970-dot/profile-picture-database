@@ -320,6 +320,18 @@
             };
         }
 
+
+        // 性能优化：预计算每一天的日期/环形角度/月标记，避免每帧重复创建 Date 对象
+        const dayRenderMeta = {};
+        for (let i = 1; i <= CONFIG.totalDays; i++) {
+            const d = new Date(CONFIG.startDate);
+            d.setDate(CONFIG.startDate.getDate() + (i - 1));
+            dayRenderMeta[i] = {
+                angle: ((i - 1) / CONFIG.totalDays) * Math.PI * 2 - Math.PI / 2,
+                monthLabel: d.getDate() === 1 ? (d.getMonth() + 1) : null
+            };
+        }
+
         // --- 2. 全局提示与 UI 辅助同步函数 (优先声明并初始化，防止 ReferenceError) ---
         function showToast(text) {
             const toast = document.getElementById('toast');
@@ -577,13 +589,15 @@
 
             showToast(`已建立 ${indexed} 幅图像索引，图片将按需载入`);
 
-            // 页面稳定后再低优先级补代表色，避免和首屏交互抢资源。
-            const startWarmup = () => warmRepresentativeColors();
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(startWarmup, { timeout: 4000 });
-            } else {
-                setTimeout(startWarmup, 2500);
-            }
+            // 性能优化：首屏完全稳定后再补代表色，避免进入页面时抢网络/CPU。
+            const startWarmup = () => {
+                if ('requestIdleCallback' in window) {
+                    requestIdleCallback(() => warmRepresentativeColors(), { timeout: 12000 });
+                } else {
+                    setTimeout(() => warmRepresentativeColors(), 12000);
+                }
+            };
+            setTimeout(startWarmup, 8000);
         }
 
         let representativeColorWarmupStarted = false;
@@ -630,7 +644,7 @@
                     }
 
                     // 主动让出主线程，保证交互流畅。
-                    await new Promise(resolve => setTimeout(resolve, 120));
+                    await new Promise(resolve => setTimeout(resolve, 260));
                 }
             }
 
@@ -964,7 +978,10 @@
         }
 
         // --- 悬浮信息面板更新 ---
+        let lastDetailIndex = -1;
         function updateDetailCard(index) {
+            if (index === lastDetailIndex) return;
+            lastDetailIndex = index;
             const data = timeDataStore[index];
             if (!data) return;
 
@@ -982,9 +999,9 @@
                 for (let i = 0; i < displayLimit; i++) {
                     const imgEl = document.createElement('img');
                     imgEl.className = "aspect-square w-full h-full object-cover rounded border border-white/5 hover:border-white/25 transition-all";
-                    imgEl.loading = "lazy";
+                    imgEl.loading = i < 6 ? "eager" : "lazy";
                     imgEl.decoding = "async";
-                    imgEl.fetchPriority = "low";
+                    imgEl.fetchPriority = i < 6 ? "high" : "low";
                     imgEl.src = data.images[i];
                     frag.appendChild(imgEl);
                 }
@@ -1046,8 +1063,15 @@
         }
 
         // --- 核心艺术渲染环路 ---
-        function animate() {
+        let lastFrameTime = 0;
+        const FRAME_INTERVAL = 1000 / 50;
+
+        function animate(now = performance.now()) {
             requestAnimationFrame(animate);
+
+            if (document.hidden) return;
+            if (now - lastFrameTime < FRAME_INTERVAL) return;
+            lastFrameTime = now;
 
             animTick += 0.05;
 
@@ -1092,7 +1116,7 @@
                 let x = 0, y = 0, z = 0;
 
                 if (!isLinear) {
-                    const angle = ((i - 1) / CONFIG.totalDays) * Math.PI * 2 - Math.PI / 2;
+                    const angle = dayRenderMeta[i].angle;
                     x = Math.cos(angle) * ringRadius;
                     z = Math.sin(angle) * ringRadius;
                     y = 0; 
@@ -1142,18 +1166,16 @@
                     isHovered: isHovered
                 });
 
-                // 月份数字
-                const currentDate = new Date(CONFIG.startDate);
-                currentDate.setDate(CONFIG.startDate.getDate() + (i - 1));
-                if (currentDate.getDate() === 1) {
-                    const monthNum = currentDate.getMonth() + 1;
+                // 月份数字（使用预计算数据）
+                const monthNum = dayRenderMeta[i].monthLabel;
+                if (monthNum !== null) {
                     
                     let labelX = x;
                     let labelZ = z;
                     let labelY = y + 16; 
                     
                     if (!isLinear) {
-                        const angle = ((i - 1) / CONFIG.totalDays) * Math.PI * 2 - Math.PI / 2;
+                        const angle = dayRenderMeta[i].angle;
                         labelX = Math.cos(angle) * (ringRadius + 38);
                         labelZ = Math.sin(angle) * (ringRadius + 38);
                     }
@@ -1278,7 +1300,11 @@
                 ctx.save();
                 const waveSpeed = CONFIG.noiseLevel * 0.15;
                 const noiseDensity = CONFIG.noiseLevel * 1.5;
-                const particleCount = Math.min(Math.floor(rawHeight * noiseDensity), 60);
+                const isActivelyInteracting =
+                    (typeof lastInteractionAt !== 'undefined') &&
+                    (performance.now() - lastInteractionAt < 220);
+                const particleCap = isActivelyInteracting ? 10 : 28;
+                const particleCount = Math.min(Math.floor(rawHeight * noiseDensity), particleCap);
 
                 for (let p = 0; p < particleCount; p++) {
                     const basePhase = Math.sin(dayIndex * 12.9898 + p * 78.233);
@@ -1338,16 +1364,13 @@
 
         // 启动艺术引擎并读取本地缓存
         window.onload = async function() {
-            animate();
-
+            // 先建立轻量图片索引，再启动视觉渲染，首屏更快。
             await loadBundledImages();
+            requestAnimationFrame(() => animate());
 
-            const dbReady = await initIndexedDB();
-            if (dbReady) {
-                loadImagesFromLocal();
-            } else {
-                showToast("未能开启本地数据记忆");
-            }
+            // 当前公开展示版已隐藏上传入口，不再首屏读取 IndexedDB 历史缓存，
+            // 避免大量本地记录重复占用内存和阻塞页面。
+            setTimeout(() => initIndexedDB(), 3000);
         };
     </script>
 
