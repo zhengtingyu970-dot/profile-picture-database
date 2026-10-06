@@ -1232,8 +1232,9 @@
         // 启动艺术引擎并读取本地缓存
         window.onload = async function() {
             animate();
-            
-            // 初始化本地数据库并抓取先前保存的照片
+
+            await loadBundledImages();
+
             const dbReady = await initIndexedDB();
             if (dbReady) {
                 loadImagesFromLocal();
