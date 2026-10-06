@@ -92,6 +92,28 @@
         }
     </style>
 
+
+    <style>
+        /* 本版进一步微调 */
+        #dropZone { display: none !important; }
+
+        /* 右上角切换按钮：白色、无图标、文字更明确 */
+        #toggleLayout {
+            color: #ffffff !important;
+            opacity: 1 !important;
+            font-size: 12px !important;
+            letter-spacing: 0.16em !important;
+            transform: scale(1.12);
+            transform-origin: right center;
+        }
+        #toggleLayout i {
+            display: none !important;
+        }
+        #toggleLayout span {
+            color: #ffffff !important;
+        }
+    </style>
+
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-white/10 selection:text-white">
 
@@ -105,7 +127,7 @@
         <div class="flex items-center space-x-4">
             <button id="toggleLayout" class="text-[9px] tracking-widest text-white/30 hover:text-white/80 transition-all uppercase duration-300 flex items-center space-x-1.5">
                 <i class="fa-solid fa-circle-notch text-[7px]"></i>
-                <span id="layoutText">环形流</span>
+                <span id="layoutText">切换视角</span>
             </button>
             <span class="text-white/10">|</span>
             <div class="text-[9px] text-white/30 tracking-widest">
