@@ -907,7 +907,7 @@
                 for (let i = 0; i < displayLimit; i++) {
                     const imgEl = document.createElement('div');
                     imgEl.className = "aspect-square rounded bg-cover bg-center border border-white/5 hover:border-white/25 transition-all";
-                    imgEl.style.backgroundImage = `url(${data.images[i]})`;
+                    imgEl.style.backgroundImage = `url("${data.images[i]}")`;
                     thumbContainer.appendChild(imgEl);
                 }
             } else {
