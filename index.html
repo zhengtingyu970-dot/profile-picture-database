@@ -589,15 +589,15 @@
 
             showToast(`已建立 ${indexed} 幅图像索引，图片将按需载入`);
 
-            // 性能优化：首屏完全稳定后再补代表色，避免进入页面时抢网络/CPU。
+            // 颜色优化：首屏稳定后尽快开始补代表色。
             const startWarmup = () => {
                 if ('requestIdleCallback' in window) {
-                    requestIdleCallback(() => warmRepresentativeColors(), { timeout: 12000 });
+                    requestIdleCallback(() => warmRepresentativeColors(), { timeout: 1800 });
                 } else {
-                    setTimeout(() => warmRepresentativeColors(), 12000);
+                    setTimeout(() => warmRepresentativeColors(), 900);
                 }
             };
-            setTimeout(startWarmup, 8000);
+            setTimeout(startWarmup, 700);
         }
 
         let representativeColorWarmupStarted = false;
@@ -615,7 +615,7 @@
             }
 
             let cursor = 0;
-            const workerCount = 1;
+            const workerCount = 4;
 
             async function worker() {
                 while (cursor < days.length) {
@@ -644,7 +644,7 @@
                     }
 
                     // 主动让出主线程，保证交互流畅。
-                    await new Promise(resolve => setTimeout(resolve, 260));
+                    await new Promise(resolve => setTimeout(resolve, 40));
                 }
             }
 
