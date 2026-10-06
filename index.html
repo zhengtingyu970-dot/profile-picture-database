@@ -114,20 +114,50 @@
         }
     </style>
 
+
+    <style>
+        /* v3 界面微调 */
+        #toggleLayout{
+            position: fixed !important;
+            right: 22px !important;
+            top: 50% !important;
+            transform: translateY(-50%) scale(1.15) !important;
+            transform-origin: right center !important;
+            z-index: 60 !important;
+            padding: 10px 14px !important;
+            border-radius: 999px !important;
+            border: 1px solid rgba(255,255,255,0.14) !important;
+            background: rgba(8,8,12,0.72) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            box-shadow: 0 0 18px rgba(255,255,255,0.06) !important;
+            color: #ffffff !important;
+            opacity: 1 !important;
+            letter-spacing: 0.18em !important;
+        }
+        #toggleLayout:hover{
+            border-color: rgba(255,255,255,0.28) !important;
+            background: rgba(18,18,24,0.85) !important;
+        }
+        #toggleLayout span{
+            color: #ffffff !important;
+        }
+    </style>
+
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-white/10 selection:text-white">
 
     <!-- 顶部极简暗色导航/艺术标题 -->
     <header class="w-full px-6 py-3.5 flex justify-between items-center z-20 border-b border-white/[0.01] bg-gradient-to-b from-[#030305] to-transparent">
         <div class="flex items-center space-x-3">
-            <span class="art-font text-sm tracking-[0.4em] text-white/70 neon-glow">CHRONO-FLOW</span>
+            <span class="art-font text-sm tracking-[0.4em] text-white/70 neon-glow">Time Specimen</span>
             <span class="w-1 h-1 bg-white/20 rounded-full"></span>
             <span class="text-[9px] tracking-wider text-white/20">2025.09.01 — 2026.09.01</span>
         </div>
         <div class="flex items-center space-x-4">
             <button id="toggleLayout" class="text-[9px] tracking-widest text-white/30 hover:text-white/80 transition-all uppercase duration-300 flex items-center space-x-1.5">
                 <i class="fa-solid fa-circle-notch text-[7px]"></i>
-                <span id="layoutText">切换视角</span>
+                <span id="layoutText">切换视角<br><span style="text-transform:none">Change Perspective</span></span>
             </button>
             <span class="text-white/10">|</span>
             <div class="text-[9px] text-white/30 tracking-widest">
@@ -789,12 +819,12 @@
             const textEl = document.getElementById('layoutText');
             const iconEl = document.querySelector('#toggleLayout i');
             if (isLinear) {
-                textEl.innerText = "线性流";
+                textEl.innerHTML = '切换视角<br><span style="text-transform:none">Change Perspective</span>';
                 iconEl.className = "fa-solid fa-chart-simple text-[7px]";
                 targetRotationX = 0.15;
                 targetRotationY = 0;
             } else {
-                textEl.innerText = "环形流";
+                textEl.innerHTML = '切换视角<br><span style="text-transform:none">Change Perspective</span>';
                 iconEl.className = "fa-solid fa-circle-notch text-[7px]";
                 targetRotationX = 0.4;
                 targetRotationY = 0;
