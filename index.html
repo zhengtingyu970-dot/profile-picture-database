@@ -6,6 +6,7 @@
     <title>时间流逝与微粒光影艺术空间</title>
     <!-- Tailwind CSS CDN -->
     <script src="./saved_resource"></script>
+    <script src="./images-list.js"></script>
     <!-- FontAwesome for Premium Icons -->
     <link rel="stylesheet" href="./all.min.css">
     <style>
@@ -298,7 +299,7 @@
             if (!db) return;
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const store = tx.objectStore(STORE_NAME);
-            store.add({ dayIndex, dateStr, src, colors });
+            store.add({ dayIndex, dateStr, src, colors, source: 'manual' });
         }
 
         // 异步从数据库读取并加载先前保存的所有图像
@@ -452,6 +453,87 @@
                 };
                 reader.readAsDataURL(file);
             });
+        }
+
+
+        // --- 4.5 自动加载网站内置图片（ceshi/） ---
+        async function loadBundledImages() {
+            const list = Array.isArray(window.IMAGE_LIST) ? window.IMAGE_LIST : [];
+            if (list.length === 0) {
+                showToast("未找到网站内置图片清单");
+                return;
+            }
+
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressText.innerText = '0%';
+
+            let loaded = 0;
+            let skipped = 0;
+            const batchSize = 16;
+
+            for (let i = 0; i < list.length; i += batchSize) {
+                const chunk = list.slice(i, i + batchSize);
+
+                await Promise.all(chunk.map(async (src) => {
+                    try {
+                        const fileName = decodeURIComponent(src.split('/').pop());
+                        const match = fileName.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                        if (!match) {
+                            skipped++;
+                            return;
+                        }
+
+                        const normalizedDate =
+                            `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+                        const dayIdx = getDayIndex(normalizedDate);
+                        if (dayIdx === -1) {
+                            skipped++;
+                            return;
+                        }
+
+                        const response = await fetch(src);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                        const blob = await response.blob();
+                        const file = new File([blob], fileName, {
+                            type: blob.type || 'image/jpeg'
+                        });
+                        const artData = await extractImageArts(file);
+
+                        const slot = timeDataStore[dayIdx];
+                        slot.totalCount++;
+                        slot.imageColors.push(...artData.colors);
+                        slot.images.push(artData.src);
+                        slot.heightFactor = 0.1 + slot.totalCount * 0.15;
+                        loaded++;
+                    } catch (err) {
+                        console.warn("内置图片加载失败:", src, err);
+                        skipped++;
+                    }
+                }));
+
+                const finished = Math.min(i + chunk.length, list.length);
+                const percent = Math.round((finished / list.length) * 100);
+                progressBar.style.width = `${percent}%`;
+                progressText.innerText = `${percent}%`;
+                await new Promise(resolve => requestAnimationFrame(resolve));
+            }
+
+            AUDIT.total += list.length;
+            AUDIT.success += loaded;
+            AUDIT.skipped += skipped;
+            document.getElementById('logTotal').innerText = AUDIT.total;
+            document.getElementById('logSuccess').innerText = AUDIT.success;
+            document.getElementById('logSkipped').innerText = AUDIT.skipped;
+            updateImgCountUI();
+
+            setTimeout(() => {
+                progressContainer.classList.add('hidden');
+                progressBar.style.width = '0%';
+            }, 800);
+
+            showToast(`已自动载入 ${loaded} 幅网站内置图像`);
         }
 
         // --- 5. 批量高吞吐解析导入 ---
