@@ -361,10 +361,9 @@
 
         // 自适应视口
         function resize() {
-            const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-            width = canvas.width = canvas.clientWidth * dpr;
-            height = canvas.height = canvas.clientHeight * dpr;
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            width = canvas.width = canvas.clientWidth * window.devicePixelRatio;
+            height = canvas.height = canvas.clientHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
         }
         window.addEventListener('resize', resize);
         resize();
@@ -508,13 +507,9 @@
 
             showToast(`已建立 ${indexed} 幅图像索引，图片将按需载入`);
 
-            // 页面稳定后再低优先级补代表色，避免和首屏交互抢资源。
-            const startWarmup = () => warmRepresentativeColors();
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(startWarmup, { timeout: 4000 });
-            } else {
-                setTimeout(startWarmup, 2500);
-            }
+            // 首屏完成后，后台低并发读取“每天一张代表图”的色彩。
+            // 不阻塞页面，也不会一次请求全部图片。
+            setTimeout(() => warmRepresentativeColors(), 700);
         }
 
         let representativeColorWarmupStarted = false;
@@ -532,7 +527,7 @@
             }
 
             let cursor = 0;
-            const workerCount = 1;
+            const workerCount = 3;
 
             async function worker() {
                 while (cursor < days.length) {
@@ -561,7 +556,7 @@
                     }
 
                     // 主动让出主线程，保证交互流畅。
-                    await new Promise(resolve => setTimeout(resolve, 120));
+                    await new Promise(resolve => setTimeout(resolve, 18));
                 }
             }
 
@@ -908,18 +903,13 @@
             thumbContainer.innerHTML = '';
             
             if (data.images.length > 0) {
-                const displayLimit = Math.min(data.images.length, 20);
-                const frag = document.createDocumentFragment();
+                const displayLimit = Math.min(data.images.length, 60);
                 for (let i = 0; i < displayLimit; i++) {
-                    const imgEl = document.createElement('img');
-                    imgEl.className = "aspect-square w-full h-full object-cover rounded border border-white/5 hover:border-white/25 transition-all";
-                    imgEl.loading = "lazy";
-                    imgEl.decoding = "async";
-                    imgEl.fetchPriority = "low";
-                    imgEl.src = data.images[i];
-                    frag.appendChild(imgEl);
+                    const imgEl = document.createElement('div');
+                    imgEl.className = "aspect-square rounded bg-cover bg-center border border-white/5 hover:border-white/25 transition-all";
+                    imgEl.style.backgroundImage = `url("${data.images[i]}")`;
+                    thumbContainer.appendChild(imgEl);
                 }
-                thumbContainer.appendChild(frag);
             } else {
                 const emptyGlow = document.createElement('div');
                 emptyGlow.className = "col-span-5 text-[8px] text-white/20 italic tracking-wider py-2 text-center";
@@ -932,7 +922,6 @@
         }
 
         function hideDetailCard() {
-            lastDetailIndex = -1;
             const card = document.getElementById('dateDetails');
             card.style.opacity = '0';
             card.style.transform = 'translateY(-50%) translateX(-15px)';
